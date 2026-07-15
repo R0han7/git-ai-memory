@@ -9,6 +9,21 @@ and manages a **retraction / supersede lifecycle** so stale knowledge never resu
 It runs entirely on a **local model via [LM Studio](https://lmstudio.ai/)** (OpenAI-compatible
 API) — no data leaves your machine, and there are **zero third-party runtime dependencies**.
 
+## Demo
+
+![gitmemory demo](docs/demo.gif)
+
+*A real run against `google/gemma-4-e4b` in LM Studio: history is ingested, a new PR
+recalls the relevant past decision, the PR reverses it, and the stale memory is
+**superseded** so it never surfaces again.*
+
+Reproduce it yourself:
+
+```bash
+python sample/live_demo.py           # live, against LM Studio
+python sample/live_demo.py --fake    # offline, no model needed
+```
+
 ---
 
 ## Why this is different
