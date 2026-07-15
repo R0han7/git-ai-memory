@@ -36,3 +36,24 @@ git -C <printed-path> log -p -- .gitmemory/memories.json   # see every add/super
 
 This is the same loop the [GitHub Action](../examples/workflows/gitmemory.yml) runs
 in production — recall on open, ingest + reconcile on merge.
+
+## Live GitHub demo (optional)
+
+`github_live_demo.py` runs the loop against a **real GitHub repo**: it creates an
+issue and posts real recall + supersede comments via the REST API (recall computed
+locally on your LM Studio model). This is the production behaviour without needing a
+self-hosted runner.
+
+```bash
+# 1. Create a fine-grained token with Contents + Issues + Pull requests = Read/write
+#    (see TOKEN_SETUP.txt), scoped ideally to a single repo.
+echo 'github_pat_xxx' > ~/.gm_token && chmod 600 ~/.gm_token
+
+# 2. Run it
+python simulation/github_live_demo.py --repo <owner>/<repo>
+```
+
+The token is read only from `~/.gm_token` (never hardcoded, never committed —
+`.gm_token` is git-ignored). The demo issue is labelled `[gitmemory demo]` and is
+safe to delete afterwards.
+

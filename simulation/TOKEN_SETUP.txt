@@ -1,0 +1,40 @@
+================================================================
+  FIX: give the gitmemory token permission to post on Issues/PRs
+================================================================
+
+WHY
+  The live GitHub demo needs to CREATE an issue and POST comments.
+  Right now the token can only READ. We just need to add write access
+  for Issues (and Pull requests). No new token needed — the value stays
+  the same, so ~/.gm_token does NOT change.
+
+CURRENT STATUS (from the capability probe)
+  Contents read .... 200  OK
+  Issues   read .... 200  OK
+  Issues   write ... 403  <-- MISSING (this is what we're fixing)
+
+STEPS
+  1. Open:  https://github.com/settings/tokens?type=beta
+  2. Click your fine-grained token, then click "Edit".
+  3. Scroll to "Repository permissions" and set:
+        - Issues .......... Read and write
+        - Pull requests ... Read and write
+        - Contents ........ Read and write   (already set; leave it)
+  4. Click "Update permissions" (a.k.a. "Save").
+  5. Done — the token string is unchanged, so no need to touch the file.
+
+AFTER SAVING
+  Tell the assistant "updated" and it will run:
+        python simulation/github_live_demo.py --repo R0han7/git-ai-memory
+  which will:
+        - create a demo issue on R0han7/git-ai-memory
+        - post a real RECALL comment (surfacing a past decision)
+        - post a follow-up showing the SUPERSEDE lifecycle
+  You can delete that issue afterwards — it's clearly labeled "[gitmemory demo]".
+
+SECURITY NOTES
+  - Keep the token only in ~/.gm_token (chmod 600). Never paste it in chat.
+  - For tighter security later, re-issue the token scoped to ONLY the
+    single demo repo instead of "All repositories".
+  - If it ever leaks, delete it at: https://github.com/settings/tokens
+================================================================

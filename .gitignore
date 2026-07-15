@@ -10,3 +10,10 @@ venv/
 .coverage
 htmlcov/
 *.log
+
+# Secrets — never commit tokens/credentials
+.gm_token
+*.token
+*_token
+.env
+.env.*
