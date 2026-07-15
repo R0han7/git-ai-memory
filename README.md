@@ -24,6 +24,13 @@ python sample/live_demo.py           # live, against LM Studio
 python sample/live_demo.py --fake    # offline, no model needed
 ```
 
+Or run the full **usability simulation** on a real local git repo (real commits,
+real merge-driver merge, git-native audit trail):
+
+```bash
+python simulation/simulate.py        # see simulation/README.md
+```
+
 ---
 
 ## Why this is different

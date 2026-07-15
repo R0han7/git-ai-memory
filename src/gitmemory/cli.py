@@ -145,6 +145,20 @@ def cmd_merge(args) -> int:
     )
     return 0
 
+def _merge_driver_command() -> str:
+    """Return a git merge-driver command that resolves in this environment.
+
+    Prefers the installed `gitmemory` console script; falls back to invoking the
+    current interpreter with the module, so it also works from a source checkout.
+    """
+    import shutil
+
+    exe = shutil.which("gitmemory")
+    if exe:
+        return f'"{exe}" merge %O %A %B -o %A'
+    return f'"{sys.executable}" -m gitmemory.cli merge %O %A %B -o %A'
+
+
 
 def cmd_install_merge_driver(args) -> int:
     """Register the union merge driver in the current git repo + .gitattributes.
@@ -152,7 +166,7 @@ def cmd_install_merge_driver(args) -> int:
     After this, local merges/rebases that touch the memory file resolve
     automatically instead of raising conflicts.
     """
-    driver_cmd = "gitmemory merge %O %A %B -o %A"
+    driver_cmd = _merge_driver_command()
     try:
         subprocess.run(
             ["git", "config", "merge.gitmemory.name", "gitmemory union merge"],
