@@ -160,6 +160,24 @@ gitmemory stats
   memory is never silently rewritten.
 - Scoped token permissions (`contents`, `issues`, `pull-requests`).
 
+### Multiple branches
+
+Memory belongs to the **default branch**; feature branches inherit it and never fork it.
+Three mechanisms keep this conflict-free for teams:
+
+1. **Canonical reads** — recall checks out the memory file from `origin/<default_branch>`,
+   so even un-rebased branches see current memory.
+2. **Serialized writes** — the ingest job uses Actions `concurrency` so memory update PRs
+   are queued, never racing (GitHub's server-side merge can't run local merge drivers).
+3. **Commutative union merge driver** — for local merges/rebases, run once per clone:
+   ```bash
+   gitmemory install-merge-driver
+   ```
+   Merging the memory file then unions records by id (with `retracted > superseded > active`
+   precedence), so it never conflicts and never reactivates retired knowledge.
+
+See [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md#multiple-branches-multiple-people) for details.
+
 ---
 
 ## Evaluation

@@ -191,6 +191,67 @@ automated check.
 
 ---
 
+## Multiple branches, multiple people
+
+Because the memory file is git-tracked, branches matter. gitmemory uses a
+**canonical-branch model** and three mechanisms to make this flawless.
+
+**The model: memory belongs to the default branch (e.g. `main`).**
+
+- Feature branches *read* memory but never *write* it. When you branch off `main`
+  you inherit its memory; you don't fork a separate memory line.
+- Memory only advances when a PR **merges into the default branch** — that's when a
+  decision becomes real. (The workflow gates ingest on
+  `base.ref == default_branch`.)
+
+**Mechanism 1 — recall always reads canonical memory.**
+Before recalling on a new PR/issue, the workflow checks out
+`.gitmemory/memories.json` from `origin/<default_branch>`. So even a stale,
+un-rebased feature branch sees the *current* team memory, not an old snapshot.
+
+**Mechanism 2 — memory writes are serialized.**
+Every merge to `main` opens a `gitmemory/update-N` PR editing the same file. If two
+merges raced, their update PRs could conflict on GitHub's server (where custom merge
+drivers don't run). The ingest job therefore uses a GitHub Actions
+`concurrency: { group: gitmemory-write, cancel-in-progress: false }` — memory updates
+are **queued, never concurrent**, so each update PR is always based on the latest
+memory and cannot conflict.
+
+**Mechanism 3 — a commutative union merge driver (for local merges/rebases).**
+For anyone merging or rebasing locally, gitmemory ships a git merge driver that
+**unions** two versions of the memory file instead of doing a line-by-line textual
+merge:
+
+```bash
+gitmemory install-merge-driver      # one-time per clone
+```
+
+This registers `merge.gitmemory.driver` and adds
+`.gitmemory/memories.json merge=gitmemory` to `.gitattributes`. Now merging the file
+never conflicts. The union is **deterministic and order-independent**:
+
+- Records unique to one side are kept.
+- For a record present on both sides, the winner is chosen by a *total order*:
+  `(lifecycle rank, updated_at, id)`, where `retracted > superseded > active`. So a
+  memory that was retired on one branch is never accidentally reactivated by a merge.
+- Provenance (`source`) from both sides is unioned.
+
+Because it's a maximum over a total order, `merge(a, b) == merge(b, a)` and grouping
+doesn't matter — exactly what a merge driver needs. (See `tests/test_merge.py` and a
+real two-branch git-merge test in `tests/test_merge_driver.py`.)
+
+**Summary of guarantees**
+
+| Concern | How it's handled |
+| --- | --- |
+| Which branch owns memory? | The default branch; features inherit, don't fork it |
+| Feature branch sees stale memory | Recall reads canonical memory from the default branch |
+| Two merges race on the file | Ingest is serialized via Actions `concurrency` |
+| Local merge/rebase conflicts | Commutative union merge driver (`install-merge-driver`) |
+| A merge reactivates old knowledge | Lifecycle precedence: `retracted > superseded > active` |
+
+---
+
 ## Try it yourself
 
 ```bash

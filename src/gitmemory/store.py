@@ -13,6 +13,7 @@ Only ACTIVE memories are returned by search, which is what keeps stale
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -21,6 +22,15 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from .models import MemoryRecord, MemoryStatus
 
 DEFAULT_STORE_PATH = ".gitmemory/memories.json"
+
+# Lifecycle precedence for conflict-free merges: once a memory has advanced to a
+# more "final" state on any branch, a merge must not revert it. retracted beats
+# superseded beats active.
+_STATUS_RANK = {
+    MemoryStatus.ACTIVE: 0,
+    MemoryStatus.SUPERSEDED: 1,
+    MemoryStatus.RETRACTED: 2,
+}
 
 
 def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
@@ -146,3 +156,49 @@ class MemoryStore:
             counts[rec.status.value] += 1
         counts["total"] = len(self._records)
         return counts
+
+
+# --------------------------------------------------------------------------- #
+# Conflict-free union merge                                                    #
+# --------------------------------------------------------------------------- #
+def _rank_key(rec: MemoryRecord) -> Tuple[int, str, str]:
+    """Total order used to pick a winner when the same id appears twice.
+
+    Ordered by (lifecycle rank, updated_at, id). Because this is a *total order*
+    and merging takes the maximum, the merge is commutative and associative:
+    merging branches in any order yields the identical result — exactly what a
+    git merge driver needs.
+    """
+    return (_STATUS_RANK[rec.status], rec.updated_at, rec.id)
+
+
+def merge_records(a: MemoryRecord, b: MemoryRecord) -> MemoryRecord:
+    """Merge two records that share an id into one deterministic winner.
+
+    The winner is the max under `_rank_key`; provenance (`source`) from both is
+    unioned and sorted so the result is independent of argument order.
+    """
+    winner, loser = (a, b) if _rank_key(a) >= _rank_key(b) else (b, a)
+    out = copy.deepcopy(winner)
+    out.source = sorted(set(list(winner.source or []) + list(loser.source or [])))
+    return out
+
+
+def merge_stores(
+    stores: Sequence["MemoryStore"], path: str = DEFAULT_STORE_PATH
+) -> "MemoryStore":
+    """Union any number of stores by id into a new store.
+
+    Records unique to one store are kept as-is; records present in several are
+    resolved via `merge_records`. Never deletes records (memories are retracted,
+    not removed), so a 3-way merge can safely ignore the common ancestor.
+    """
+    out = MemoryStore(path)
+    for st in stores:
+        for rec in st.all():
+            existing = out.get(rec.id)
+            if existing is None:
+                out._records[rec.id] = copy.deepcopy(rec)
+            else:
+                out._records[rec.id] = merge_records(existing, rec)
+    return out

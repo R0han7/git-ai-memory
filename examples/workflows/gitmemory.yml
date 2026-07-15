@@ -2,27 +2,35 @@
 #
 # IMPORTANT: because the model runs locally in LM Studio, these jobs must run on
 # a SELF-HOSTED runner that has LM Studio installed, a model loaded, and the
-# local server enabled (Developer tab). GitHub-hosted runners cannot reach it.
+# local server enabled. GitHub-hosted runners cannot reach it.
 #
-# Place this file at .github/workflows/gitmemory.yml in the consuming repo and
+# Place this at .github/workflows/gitmemory.yml in the consuming repo and
 # replace `your-org/gitmemory@v0` with the published action reference.
+#
+# MULTI-BRANCH MODEL
+#   * Memory is a property of the DEFAULT branch (e.g. main). Feature branches
+#     read it but never write it.
+#   * INGEST runs only when a PR merges INTO the default branch, and is
+#     SERIALIZED via `concurrency` so two merges can never race on the memory
+#     file (GitHub's server-side merge does not run local merge drivers, so we
+#     prevent the race instead of resolving it).
+#   * RECALL always reads the canonical memory from the default branch, so a
+#     stale/un-rebased feature branch still sees current memory.
 
 name: Project Memory
 
 on:
-  # Surface relevant past memories when work opens.
   issues:
     types: [opened, edited]
   pull_request:
     types: [opened, edited, reopened]
-  # Distill new durable memories once work lands.
   pull_request_target:
     types: [closed]
 
 permissions:
-  contents: write        # to commit updated memory file on ingest
-  issues: write          # to comment on issues
-  pull-requests: write   # to comment on PRs
+  contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   recall:
@@ -30,6 +38,15 @@ jobs:
     runs-on: [self-hosted, lmstudio]
     steps:
       - uses: actions/checkout@v4
+      - name: Load canonical memory from the default branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEF="${{ github.event.repository.default_branch }}"
+          git fetch --depth=1 origin "$DEF" || true
+          # Overwrite the working-tree memory file with the default branch's copy
+          # so recall reflects current memory regardless of this branch's state.
+          git checkout "origin/$DEF" -- .gitmemory/memories.json 2>/dev/null || true
       - id: mem
         uses: your-org/gitmemory@v0
         with:
@@ -45,19 +62,32 @@ jobs:
           script: |
             const body = `${{ steps.mem.outputs.comment }}`;
             if (!body.trim()) return;
-            const issue_number = context.issue.number;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number,
+              issue_number: context.issue.number,
               body,
             });
 
   ingest:
-    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    # Only distill memory when a PR is merged INTO the default branch.
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: [self-hosted, lmstudio]
+    # Serialize all memory writes: queued, never cancelled, so update PRs are
+    # always based on the latest memory and cannot conflict on the server.
+    concurrency:
+      group: gitmemory-write
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Register union merge driver (for local merges/rebases)
+        shell: bash
+        run: gitmemory install-merge-driver || pipx run gitmemory install-merge-driver || true
       - uses: your-org/gitmemory@v0
         with:
           mode: ingest
@@ -69,11 +99,12 @@ jobs:
       - name: Open PR with updated memory
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "chore(memory): update project memory from PR #${{ github.event.pull_request.number }}"
+          commit-message: "chore(memory): update from PR #${{ github.event.pull_request.number }}"
           title: "chore(memory): distilled memory from PR #${{ github.event.pull_request.number }}"
           body: |
             Automated memory update from gitmemory.
             Review the added / superseded / retracted memories before merging.
           branch: "gitmemory/update-${{ github.event.pull_request.number }}"
+          base: ${{ github.event.repository.default_branch }}
           add-paths: |
             .gitmemory/memories.json

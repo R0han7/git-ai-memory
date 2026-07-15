@@ -1,0 +1,13 @@
+# Drop this line into the .gitattributes of any repo that uses gitmemory.
+#
+# It tells git to resolve merges/rebases of the memory file with gitmemory's
+# commutative union merge driver instead of a line-based textual merge, so the
+# file never produces conflicts locally.
+#
+# One-time setup per clone (registers the driver referenced below):
+#
+#     gitmemory install-merge-driver
+#
+# (install-merge-driver also appends this exact line for you if it is missing.)
+
+.gitmemory/memories.json merge=gitmemory
