@@ -59,3 +59,25 @@ The token is read only from `~/.gm_token` (never hardcoded, never committed —
 `.gm_token` is git-ignored). The demo issue is labelled `[gitmemory demo]` and is
 safe to delete afterwards.
 
+## Analyze any existing repo (read-only)
+
+`analyze_repo.py` builds a memory from a real repo's history **without posting or
+modifying anything** — useful for seeing what gitmemory would learn before adopting it.
+
+```bash
+# From merged PRs + closed issues (best for repos with real PR discussion)
+python simulation/analyze_repo.py --repo owner/name
+
+# From commit messages (best for solo/commit-driven repos with no PRs)
+python simulation/analyze_repo.py --repo owner/name --source commits
+
+# Ask a question against what it learned
+python simulation/analyze_repo.py --repo owner/name --source commits \
+    --query "what database does this project use?"
+```
+
+Note: output quality depends on the **quality of the source text**. Repos that merge
+empty PRs or commit with messages like "update" yield little; repos with descriptive
+PRs/commits (e.g. "Migrate database to Neon PostgreSQL") yield clean, useful memories.
+
+
