@@ -31,6 +31,8 @@ real merge-driver merge, git-native audit trail):
 python simulation/simulate.py        # see simulation/README.md
 ```
 
+![gitmemory simulation](docs/simulation.gif)
+
 ### Live on GitHub
 
 gitmemory has also been run against a **real GitHub repository**, posting real recall

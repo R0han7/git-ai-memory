@@ -5,6 +5,8 @@ repository** through a realistic timeline — real commits, a real memory file i
 git history, and a real git merge using the union merge driver. No GitHub account
 or network is required.
 
+![gitmemory simulation](../docs/simulation.gif)
+
 ## Run it
 
 ```bash
