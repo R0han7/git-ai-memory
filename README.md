@@ -42,6 +42,9 @@ active  ──supersede──▶  superseded        (a newer decision replaced i
 Only **active** memories are ever surfaced on recall — that's the mechanism that keeps
 the system from poisoning new work with outdated context.
 
+> **New here?** Read [**docs/HOW_IT_WORKS.md**](docs/HOW_IT_WORKS.md) for a plain-English
+> walkthrough with real examples.
+
 ---
 
 ## Architecture
