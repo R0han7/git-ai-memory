@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitmemory"
+version = "0.1.0"
+description = "Git-native AI memory for GitHub with a retraction/supersede lifecycle, running on a local model via LM Studio."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "gitmemory contributors" }]
+keywords = ["ai", "agents", "github", "memory", "rag", "lm-studio", "llm"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+gitmemory = "gitmemory.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

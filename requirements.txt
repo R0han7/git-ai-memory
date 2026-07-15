@@ -1,0 +1,6 @@
+# Runtime: zero third-party dependencies.
+# The LM Studio client talks to the OpenAI-compatible endpoint using only the
+# Python standard library (urllib + json), so the tool runs anywhere Python does.
+
+# Development / testing only:
+pytest>=7.0

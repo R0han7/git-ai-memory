@@ -1,0 +1,79 @@
+# Example workflow for a repo that consumes the gitmemory action.
+#
+# IMPORTANT: because the model runs locally in LM Studio, these jobs must run on
+# a SELF-HOSTED runner that has LM Studio installed, a model loaded, and the
+# local server enabled (Developer tab). GitHub-hosted runners cannot reach it.
+#
+# Place this file at .github/workflows/gitmemory.yml in the consuming repo and
+# replace `your-org/gitmemory@v0` with the published action reference.
+
+name: Project Memory
+
+on:
+  # Surface relevant past memories when work opens.
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited, reopened]
+  # Distill new durable memories once work lands.
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write        # to commit updated memory file on ingest
+  issues: write          # to comment on issues
+  pull-requests: write   # to comment on PRs
+
+jobs:
+  recall:
+    if: github.event.action != 'closed'
+    runs-on: [self-hosted, lmstudio]
+    steps:
+      - uses: actions/checkout@v4
+      - id: mem
+        uses: your-org/gitmemory@v0
+        with:
+          mode: recall
+          content: |
+            ${{ github.event.issue.title || github.event.pull_request.title }}
+
+            ${{ github.event.issue.body || github.event.pull_request.body }}
+      - name: Post recall comment
+        if: steps.mem.outputs.comment != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.mem.outputs.comment }}`;
+            if (!body.trim()) return;
+            const issue_number = context.issue.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body,
+            });
+
+  ingest:
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: [self-hosted, lmstudio]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: your-org/gitmemory@v0
+        with:
+          mode: ingest
+          source: "PR#${{ github.event.pull_request.number }}"
+          content: |
+            ${{ github.event.pull_request.title }}
+
+            ${{ github.event.pull_request.body }}
+      - name: Open PR with updated memory
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(memory): update project memory from PR #${{ github.event.pull_request.number }}"
+          title: "chore(memory): distilled memory from PR #${{ github.event.pull_request.number }}"
+          body: |
+            Automated memory update from gitmemory.
+            Review the added / superseded / retracted memories before merging.
+          branch: "gitmemory/update-${{ github.event.pull_request.number }}"
+          add-paths: |
+            .gitmemory/memories.json

@@ -1,0 +1,83 @@
+name: "gitmemory"
+description: "Git-native AI memory: recall relevant decisions/gotchas on new PRs & issues, and distill new memories on merge — powered by a local model via LM Studio."
+author: "gitmemory"
+branding:
+  icon: "cpu"
+  color: "purple"
+
+inputs:
+  mode:
+    description: "Operation: 'recall' (comment on new activity) or 'ingest' (distill + reconcile on merge/close)."
+    required: true
+  source:
+    description: "Provenance label for ingest, e.g. 'PR#231'. Required for ingest."
+    required: false
+    default: ""
+  content:
+    description: "Text to recall against or ingest from (PR/issue title + body + discussion)."
+    required: false
+    default: ""
+  store:
+    description: "Path to the in-repo memory file."
+    required: false
+    default: ".gitmemory/memories.json"
+  base-url:
+    description: "LM Studio OpenAI-compatible base URL."
+    required: false
+    default: "http://localhost:1234/v1"
+  chat-model:
+    description: "Chat model identifier loaded in LM Studio."
+    required: false
+    default: "local-model"
+  embedding-model:
+    description: "Embedding model identifier loaded in LM Studio."
+    required: false
+    default: "text-embedding-nomic-embed-text-v1.5"
+  min-score:
+    description: "Minimum cosine similarity to surface a memory on recall."
+    required: false
+    default: "0.15"
+
+outputs:
+  comment:
+    description: "Markdown comment produced by recall (empty if nothing relevant)."
+    value: ${{ steps.run.outputs.comment }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install gitmemory
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Run gitmemory
+      id: run
+      shell: bash
+      env:
+        LMSTUDIO_BASE_URL: ${{ inputs.base-url }}
+        LMSTUDIO_CHAT_MODEL: ${{ inputs.chat-model }}
+        LMSTUDIO_EMBED_MODEL: ${{ inputs.embedding-model }}
+        GITMEMORY_STORE: ${{ inputs.store }}
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.mode }}" = "recall" ]; then
+          printf '%s' "${{ inputs.content }}" | \
+            gitmemory recall --output comment.md --min-score "${{ inputs.min-score }}"
+          {
+            echo 'comment<<GITMEMORY_EOF'
+            cat comment.md
+            echo
+            echo 'GITMEMORY_EOF'
+          } >> "$GITHUB_OUTPUT"
+        elif [ "${{ inputs.mode }}" = "ingest" ]; then
+          printf '%s' "${{ inputs.content }}" | \
+            gitmemory ingest --source "${{ inputs.source }}"
+        else
+          echo "Unknown mode: ${{ inputs.mode }}" >&2
+          exit 1
+        fi

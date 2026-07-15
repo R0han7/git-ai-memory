@@ -1,0 +1,92 @@
+{
+  "seed_memories": [
+    {
+      "key": "orders_locking",
+      "type": "decision",
+      "claim": "Order updates use optimistic locking via a version column, not row locks.",
+      "reason": "Row locks caused deadlocks and lock-wait timeouts under checkout load.",
+      "tags": ["orders", "locking", "concurrency", "database"],
+      "status": "active"
+    },
+    {
+      "key": "inventory_ttl",
+      "type": "gotcha",
+      "claim": "Inventory cache TTL must stay under 60 seconds.",
+      "reason": "A 300s TTL caused stale counts and oversells during flash sales.",
+      "tags": ["inventory", "redis", "cache", "ttl"],
+      "status": "active"
+    },
+    {
+      "key": "utc_timestamps",
+      "type": "convention",
+      "claim": "All timestamps are stored in UTC and converted only at display time.",
+      "reason": "Mixed local timezones caused off-by-hours bugs in reports.",
+      "tags": ["timestamps", "timezone", "utc", "convention"],
+      "status": "active"
+    },
+    {
+      "key": "ssr_dead_end",
+      "type": "dead_end",
+      "claim": "Server-side rendering for the analytics dashboard is a dead end.",
+      "reason": "SSR added 400-700ms latency due to uncacheable per-user aggregation queries.",
+      "tags": ["dashboard", "ssr", "rendering", "performance"],
+      "status": "active"
+    },
+    {
+      "key": "old_auth_sessions",
+      "type": "decision",
+      "claim": "Authentication uses server-side sessions stored in Redis.",
+      "reason": "Chosen early for simplicity.",
+      "tags": ["auth", "sessions", "redis", "security"],
+      "status": "superseded"
+    },
+    {
+      "key": "wrong_email_provider",
+      "type": "decision",
+      "claim": "Transactional email is sent through the legacy SMTP relay.",
+      "reason": "Original setup before the provider migration.",
+      "tags": ["email", "smtp", "notifications"],
+      "status": "retracted"
+    }
+  ],
+  "recall_cases": [
+    {
+      "query": "We keep getting deadlocks when two workers update the same order row. Should we add SELECT FOR UPDATE row locks?",
+      "relevant_keys": ["orders_locking"]
+    },
+    {
+      "query": "Users report oversold items during a big sale. Is the inventory cache configured correctly?",
+      "relevant_keys": ["inventory_ttl"]
+    },
+    {
+      "query": "A report shows timestamps that are off by several hours depending on the user.",
+      "relevant_keys": ["utc_timestamps"]
+    },
+    {
+      "query": "Proposal: move the analytics dashboard to server-side rendering for faster first paint.",
+      "relevant_keys": ["ssr_dead_end"]
+    }
+  ],
+  "staleness_cases": [
+    {
+      "query": "How do we handle authentication sessions and where are they stored?",
+      "must_not_surface_keys": ["old_auth_sessions"]
+    },
+    {
+      "query": "Which provider do we use to send transactional email notifications?",
+      "must_not_surface_keys": ["wrong_email_provider"]
+    }
+  ],
+  "conflict_cases": [
+    {
+      "new_memory": {
+        "type": "decision",
+        "claim": "Order updates now use row-level locking (SELECT FOR UPDATE) with a short statement timeout.",
+        "reason": "Retry storms from optimistic locking hurt tail latency; row locks + timeout are more predictable.",
+        "tags": ["orders", "locking", "concurrency", "database"]
+      },
+      "expected_existing_key": "orders_locking",
+      "expected_action": "supersede"
+    }
+  ]
+}
