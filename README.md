@@ -31,6 +31,22 @@ real merge-driver merge, git-native audit trail):
 python simulation/simulate.py        # see simulation/README.md
 ```
 
+### Live on GitHub
+
+gitmemory has also been run against a **real GitHub repository**, posting real recall
+and supersede comments via the API (recall computed locally on `gemma-4-e4b`):
+
+- **Recall** caught a proposed change that contradicted a past decision (surfaced at
+  0.83 relevance).
+- After a reversal, gitmemory **superseded** the old memory and the follow-up comment
+  reflected the new decision (0.87) — the stale one no longer appeared.
+
+<!-- Add a screenshot at docs/live-demo.png (screenshot of the demo issue) and it will render below -->
+<!-- ![live on GitHub](docs/live-demo.png) -->
+
+Run it on your own repo with `python simulation/github_live_demo.py --repo <owner>/<repo>`
+(see [simulation/README.md](simulation/README.md) and `simulation/TOKEN_SETUP.txt`).
+
 ---
 
 ## Why this is different
